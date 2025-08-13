@@ -11,10 +11,10 @@ import ULThemeLink from "@/components/ULThemeLink";
 import { ULThemePasswordField } from "@/components/ULThemePasswordField";
 import { ULThemePrimaryButton } from "@/components/ULThemePrimaryButton";
 import { getFieldError } from "@/utils/helpers/errorUtils";
-import { getIdentifierDetails } from "@/utils/helpers/identifierUtils";
 import { rebaseLinkToCurrentOrigin } from "@/utils/helpers/urlUtils";
 
 import { useLoginManager } from "../hooks/useLoginManager";
+import AlternativeLogins from "./AlternativeLogins";
 
 interface LoginFormData {
   username: string;
@@ -31,8 +31,8 @@ function LoginForm() {
     resetPasswordLink,
     isForgotPasswordEnabled,
     texts,
-    allowedIdentifiers,
     passwordPolicy,
+    loginInstance,
   } = useLoginManager();
 
   const form = useForm<LoginFormData>({
@@ -48,17 +48,10 @@ function LoginForm() {
   } = form;
 
   // Handle text fallbacks in component
-  const buttonText = texts?.buttonText || "Continue";
+  const buttonText = texts?.buttonText || "Sign in";
   const captchaLabel = texts?.captchaCodePlaceholder?.concat("*") || "CAPTCHA*";
   const captchaImageAlt = "CAPTCHA challenge"; // Default fallback
-  const forgotPasswordText = texts?.forgotPasswordText || "Forgot Password?";
-
-  // Use getIdentifierDetails pattern for username label
-  const {
-    label: usernameLabel,
-    type: usernameType,
-    autoComplete: usernameAutoComplete,
-  } = getIdentifierDetails(allowedIdentifiers, texts);
+  const forgotPasswordText = texts?.forgotPasswordText || "Forgot password?";
 
   const passwordLabel = texts?.passwordPlaceholder?.concat("*") || "Password*";
 
@@ -81,9 +74,12 @@ function LoginForm() {
   const localizedResetPasswordLink =
     resetPasswordLink && rebaseLinkToCurrentOrigin(resetPasswordLink);
 
+  // Get social connections
+  const socialConnectionsList = loginInstance?.transaction?.alternateConnections;
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         {/* General alerts at the top */}
         {generalErrors.length > 0 && (
           <div className="space-y-3 mb-4">
@@ -108,13 +104,15 @@ function LoginForm() {
           }}
           render={({ field, fieldState }) => (
             <FormItem>
-              <ULThemeFloatingLabelField
+              <input
                 {...field}
-                label={usernameLabel}
-                type={usernameType}
+                type="email"
+                placeholder="Email address"
                 autoFocus={true}
-                autoComplete={usernameAutoComplete}
-                error={!!fieldState.error || !!usernameSDKError}
+                autoComplete="email"
+                className={`w-full h-10 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  fieldState.error || usernameSDKError ? 'border-red-500' : 'border-gray-300'
+                }`}
               />
               <ULThemeFormMessage
                 sdkError={usernameSDKError}
@@ -143,12 +141,32 @@ function LoginForm() {
           }}
           render={({ field, fieldState }) => (
             <FormItem>
-              <ULThemePasswordField
-                {...field}
-                label={passwordLabel}
-                autoComplete="current-password"
-                error={!!fieldState.error || !!passwordSDKError}
-              />
+              <div className="relative">
+                <input
+                  {...field}
+                  type="password"
+                  placeholder="Password"
+                  autoComplete="current-password"
+                  className={`w-full h-10 px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    fieldState.error || passwordSDKError ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => {
+                    const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+                    if (input) {
+                      input.type = input.type === 'password' ? 'text' : 'password';
+                    }
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+              </div>
               <ULThemeFormMessage
                 sdkError={passwordSDKError}
                 hasFormError={!!fieldState.error}
@@ -177,22 +195,32 @@ function LoginForm() {
         )}
 
         {/* Forgot Password link */}
-        <div className="text-left">
+        <div className="text-right">
           {isForgotPasswordEnabled && localizedResetPasswordLink && (
-            <ULThemeLink href={localizedResetPasswordLink}>
+            <ULThemeLink href={localizedResetPasswordLink} className="text-blue-600 hover:text-blue-800 text-sm">
               {forgotPasswordText}
             </ULThemeLink>
           )}
         </div>
 
-        {/* Submit button */}
-        <ULThemePrimaryButton
-          type="submit"
-          className="w-full"
-          disabled={isSubmitting}
-        >
-          {buttonText}
-        </ULThemePrimaryButton>
+        {/* Login buttons row */}
+        <div className="flex space-x-3">
+          {/* Social login button */}
+          {socialConnectionsList && socialConnectionsList.length > 0 && (
+            <div className="flex-1">
+              <AlternativeLogins connections={socialConnectionsList} />
+            </div>
+          )}
+          
+          {/* Sign in button */}
+          <ULThemePrimaryButton
+            type="submit"
+            className="flex-1 h-10 text-sm font-medium bg-blue-600 hover:bg-blue-700"
+            disabled={isSubmitting}
+          >
+            {buttonText}
+          </ULThemePrimaryButton>
+        </div>
       </form>
     </Form>
   );
